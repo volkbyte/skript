@@ -1,0 +1,42 @@
+# Example .skriptrc — the executor definition of a skript root directory.
+#
+# This file must sit in the root it governs; that directory is the value of
+# ${SKRIPT_ROOT}. meta.version must be exactly "1".
+
+[meta]
+version = "1"
+author  = "kael"   # additional user metadata is ignored
+
+[executor]
+# EXEC executor: invokes /home/<user>/projects/skript-demo/tools/lua (via
+# PATH or the absolute path) as
+#   [lua, "-i-env", <SKRIPT_ROOT>/tools/lua.d/main.lua, ...user-vargs]
+type = "exec"
+executable = "${SKRIPT_ROOT}/tools/bin/lua"
+args       = ["-e", "rules loaded from ${env:HOME}/.luarc"]
+entrypoint = "main.lua"    # resolves only against ${SKRIPT_ROOT}; must exist
+
+# A file target (`skript ./main.lua`) replaces the entrypoint slot with the
+# matched file itself.
+
+# COMMAND executor alternatives (comment out `executor` above to try):
+#
+# String form - through the platform shell (sh -c on Linux, cmd /C call on
+# Windows). All vargs are appended to the command text.
+# [executor]
+# type = "command"
+# command = "make -f ${SKRIPT_ROOT}/rules.mk target"
+
+# Array form - no shell at all. The safe choice against quoting pitfalls.
+# [executor]
+# type = "command"
+# command = ["make", "-f", "${SKRIPT_ROOT}/rules.mk"]
+
+[executor.environment]
+# String values interpolate once; arrays join with the platform's
+# path-list separator (`:` on Linux, `;` on Windows).
+LUA_PATH = [
+    "${SKRIPT_ROOT}/lib/?.lua",
+    "${SKRIPT_ROOT}/vendor/?.lua",
+]
+LUA_RULES = "rules=$${PROJECT}"   # $$ escape: stays rules=${PROJECT}

@@ -1,0 +1,70 @@
+# https://taskfile.dev — runner: https://taskfile.dev/installation
+# Layout:
+#   task build            → both platforms (dist/skript.exe + dist/skript-linux-amd64)
+#   task build:windows    → Windows only
+#   task build:linux      → linux/amd64 only (crosses from any host)
+# Commands below are the ones the README documents; this file wires them up
+# as named, platform-aware tasks.
+
+version: '3'
+
+vars:
+  DIST: dist
+
+tasks:
+  default:
+    desc: build skript for every supported platform
+    cmds:
+      - task: build
+
+  build:
+    desc: build skript for Windows and linux/amd64
+    deps: [build:windows, build:linux]
+
+  build:windows:
+    desc: build skript for Windows (dist/skript.exe)
+    env:
+      CGO_ENABLED: '0'
+      GOOS: windows
+      GOARCH: amd64
+    cmds:
+      - go build -trimpath -o {{.DIST}}/skript.exe ./cmd/skript
+
+  build:linux:
+    desc: build skript for linux/amd64 (dist/skript-linux-amd64)
+    env:
+      CGO_ENABLED: '0'
+      GOOS: linux
+      GOARCH: amd64
+    cmds:
+      - go build -trimpath -o {{.DIST}}/skript-linux-amd64 ./cmd/skript
+
+  vet:
+    desc: static checks
+    cmds:
+      - go vet ./...
+
+  test:
+    desc: full suite (unit + e2e; spawns real child processes)
+    cmds:
+      - go test ./...
+
+  smoke:linux:
+    desc: linux-side smoke run (needs bash; on Windows run through WSL)
+    deps: [build:linux]
+    cmds:
+      - bash scripts/smoke-linux.sh {{.DIST}}/skript-linux-amd64
+
+  smoke:windows:
+    desc: windows-side smoke run
+    deps: [build:windows]
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-windows.ps1 -Skript {{.DIST}}/skript.exe
+
+  clean:
+    desc: remove build artifacts (including Task's cache dir)
+    cmds:
+      - cmd: rm -rf {{.DIST}} .task
+        platforms: [linux, darwin]
+      - cmd: powershell -NoProfile -Command "Remove-Item -Recurse -Force {{.DIST}}, .task -ErrorAction SilentlyContinue"
+        platforms: [windows]

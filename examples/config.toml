@@ -1,0 +1,33 @@
+# Example user configuration: ~/.volkbyte/skript/config.toml
+#
+# A missing config.toml is an empty, valid configuration. An unparseable one
+# aborts with one `skript: <reason>` line (exit 1). No ${} interpolation
+# happens in this file; write absolute paths (or `~`-prefixed ones) as-is.
+
+[skripts]
+# Alias targets: prefer absolute paths, or `~`-prefixed ones. A relative
+# path resolves against the directory containing config.toml.
+hello = "~/projects/helloer/main.lua"
+demo  = "~/projects/skript-demo"            # a skript root (has .skriptrc)
+docs-build = "~/projects/docs/build.lua"    # relative forms work too
+
+# Alias names must match ^[A-Za-z][A-Za-z0-9/_-]*$ and always win over a
+# real path with the same spelling.
+
+[associations]
+# Glob patterns over the skript's file name -> executor. Most specific
+# pattern wins (more literal characters beat fewer). There is NO entrypoint
+# field: the matched file occupies the entrypoint slot. Values are either a
+# bare executable path...
+"*.lua"       = "lua"
+"*.apple.lua" = "/opt/luaJIT/lua"
+"*.sh"        = "/bin/bash"
+"*.py"        = "python3"
+
+# ...or an exec executor table (still without an entrypoint field):
+#
+# [associations."*.strict.lua"]
+# type       = "exec"
+# executable = "lua"
+# args       = ["-Xstrict"]
+
