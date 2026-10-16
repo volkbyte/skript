@@ -75,6 +75,58 @@ args = ["-J"]
 	})
 }
 
+func TestLoad_AssociationTildeExpansion(t *testing.T) {
+	home := "/home/kael"
+	content := `
+[associations]
+"*.lua" = "~/bin/lua55"
+"*.py" = "python3"
+"*.sh" = "bin/run.sh"
+
+[associations."*.apple.lua"]
+type = "exec"
+executable = "~"
+args = ["-J"]
+`
+	cfg, err := Load(writeConfig(t, content), home)
+	if err != nil {
+		t.Fatalf("Load() unexpected error: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		pattern  string
+		expected string
+	}{
+		{name: "tilde path expands to home", pattern: "*.lua", expected: filepath.Join(home, "bin", "lua55")},
+		{name: "bare tilde expands to home", pattern: "*.apple.lua", expected: home},
+		{name: "bare name is untouched", pattern: "*.py", expected: "python3"},
+		{name: "relative path is untouched", pattern: "*.sh", expected: "bin/run.sh"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := cfg.Associations[tt.pattern]; got != tt.expected {
+				t.Errorf("associations[%q] = %q, want %q", tt.pattern, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestLoad_AssociationTildeWithoutHome(t *testing.T) {
+	content := `
+[associations]
+"*.lua" = "~/bin/lua55"
+`
+	_, err := Load(writeConfig(t, content), "")
+	if err == nil {
+		t.Fatal("Load() = nil error, want a cannot-expand failure")
+	}
+	if !strings.Contains(err.Error(), `associations: "*.lua": cannot expand "~/bin/lua55"`) {
+		t.Errorf("Load() error = %q, want the pattern-scoped expansion failure", err)
+	}
+}
+
 func TestLoad_Errors(t *testing.T) {
 	tests := []struct {
 		name    string

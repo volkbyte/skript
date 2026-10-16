@@ -2,7 +2,8 @@
 #
 # A missing config.toml is an empty, valid configuration. An unparseable one
 # aborts with one `skript: <reason>` line (exit 1). No ${} interpolation
-# happens in this file; write absolute paths (or `~`-prefixed ones) as-is.
+# happens in this file; write absolute paths, or `~`-prefixed ones (they
+# expand to your home directory, in [skripts] and [associations] alike).
 
 [skripts]
 # Alias targets: prefer absolute paths, or `~`-prefixed ones. A relative
@@ -17,14 +18,17 @@ docs-build = "~/projects/docs/build.lua"    # relative forms work too
 [associations]
 # Glob patterns over the skript's file name -> executor. Most specific
 # pattern wins (more literal characters beat fewer). There is NO entrypoint
-# field: the matched file occupies the entrypoint slot. Values are either a
+# field: the matched file occupies the entrypoint slot. A `~`-prefixed
+# executor path expands to your home directory. Values are either a
 # bare executable path...
 "*.lua"       = "lua"
+"*.mine.lua"  = "~/.bin/lua55.exe"    # home-anchored: ~ expands like in [skripts]
 "*.apple.lua" = "/opt/luaJIT/lua"
 "*.sh"        = "/bin/bash"
 "*.py"        = "python3"
 
-# ...or an exec executor table (still without an entrypoint field):
+# ...or an exec executor table (associations are exec-only, and still
+# without an entrypoint field):
 #
 # [associations."*.strict.lua"]
 # type       = "exec"

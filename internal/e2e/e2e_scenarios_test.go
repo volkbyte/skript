@@ -386,6 +386,42 @@ func TestE2E_AssociationFallback(t *testing.T) {
 	}
 }
 
+func TestE2E_AssociationTildeExecutor(t *testing.T) {
+	h := newHome(t)
+	work := t.TempDir()
+	out := filepath.Join(work, "out.txt")
+
+	// The executor lives inside the fake home and is reachable only through
+	// the `~` expansion of the association value.
+	binDir := filepath.Join(h.dir, ".bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(echoBin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tildeBin := filepath.Join(binDir, filepath.Base(echoBin))
+	if err := os.WriteFile(tildeBin, data, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	h.config(fmt.Sprintf("[associations]\n\"*.x\" = %s\n",
+		tomlStr("~/.bin/"+filepath.Base(echoBin))))
+
+	skriptFile := filepath.Join(work, "tilde.x")
+	write(t, skriptFile, "-- tilde association skript")
+
+	exit, _, stderr := h.run(work, "tilde.x", "-out="+out)
+	assertExit(t, exit, 0, stderr)
+	assertStderrEmpty(t, stderr)
+
+	got := outLines(t, out)
+	if len(got) != 1 || got[0] != "tilde.x" {
+		t.Fatalf("lines = %q, want the file spelling", got)
+	}
+}
+
 func TestE2E_AssociationMostSpecificWins(t *testing.T) {
 	h := newHome(t)
 	work := t.TempDir()

@@ -7,8 +7,9 @@
 //   - Alias names must match ^[A-Za-z][A-Za-z0-9/_-]*$.
 //   - Association patterns are glob patterns over skript filenames; they are
 //     validated at load time.
-//   - No ${} interpolation happens inside config.toml; values are used as-is
-//     (after alias-specific path handling, see AliasTarget).
+//   - No ${} interpolation happens inside config.toml; values are used as-is,
+//     except that a `~`-prefixed path expands to the user's home directory —
+//     in alias targets (see AliasTarget) and in association executors.
 package config
 
 import (
@@ -41,7 +42,8 @@ type Config struct {
 }
 
 // Load parses the config file at path. home is the user's home directory,
-// used to expand `~` in alias targets. A missing file yields an empty config.
+// used to expand `~` in alias targets and association executors. A missing
+// file yields an empty config.
 func Load(path, home string) (*Config, error) {
 	cfg := &Config{Dir: filepath.Dir(path), home: home}
 
@@ -62,7 +64,7 @@ func Load(path, home string) (*Config, error) {
 		return nil, fmt.Errorf("parse config %s: %w", path, err)
 	}
 
-	associations, err := normaliseAssociations(raw.Associations)
+	associations, err := normaliseAssociations(raw.Associations, home)
 	if err != nil {
 		return nil, fmt.Errorf("config %s: %w", path, err)
 	}
@@ -79,25 +81,40 @@ func Load(path, home string) (*Config, error) {
 // string or as an exec executor table ({type = "exec", executable = ..., args
 // = [...]}) without an entrypoint field — there is deliberately no
 // entrypoint in associations, because the matched file occupies that slot.
-func normaliseAssociations(raw map[string]any) (map[string]string, error) {
+//
+// Both forms resolve to one executor path, which then gets the same `~`
+// handling as alias targets (see expandHome): a `~`-prefixed path anchors in
+// the user's home directory. Bare names and ordinary relative paths pass
+// through untouched and keep their exec-time PATH and working-directory
+// semantics.
+func normaliseAssociations(raw map[string]any, home string) (map[string]string, error) {
 	if raw == nil {
 		return nil, nil
 	}
 
 	result := make(map[string]string, len(raw))
 	for pattern, value := range raw {
+		var (
+			executable string
+			err        error
+		)
 		switch v := value.(type) {
 		case string:
-			result[pattern] = v
+			executable = v
 		case map[string]any:
-			executable, err := assocExecutor(pattern, v)
-			if err != nil {
-				return nil, err
-			}
-			result[pattern] = executable
+			executable, err = assocExecutor(pattern, v)
 		default:
 			return nil, fmt.Errorf("associations: %q must be an executable path or an exec table", pattern)
 		}
+		if err != nil {
+			return nil, err
+		}
+
+		executable, _, err = expandHome(executable, home)
+		if err != nil {
+			return nil, fmt.Errorf("associations: %q: %w", pattern, err)
+		}
+		result[pattern] = executable
 	}
 	return result, nil
 }
